@@ -17,11 +17,25 @@ class DragonChain(object):
         return self
 
     def map(self, func):
-        return DragonChain(map(func, self))
+        return self.__class__(map(func, self))
 
     def filter(self, func):
-        return DragonChain(filter(func, self))
+        return self.__class__(filter(func, self))
 
     def collect(self, collector):
         return collector(self)
+
+    def add(self, *stream_or_things):
+        return self.__class__(self, *stream_or_things)
+
+    def chain(self, *args):
+        return self.add(args)
+
+    def exclude(self, func):
+        return self.filter(lambda x: not func(x))
+
+    def minus(self, func):
+        return self.exclude(func)
+
+
 
