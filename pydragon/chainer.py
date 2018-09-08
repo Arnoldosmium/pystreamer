@@ -2,7 +2,7 @@ from itertools import chain
 from .util import streamify
 
 
-class DragonChain(object):
+class Dragon(object):
     def __init__(self, *stream_or_things):
         self.stream_list = map(streamify, stream_or_things)
         self._stream = chain.from_iterable(self.stream_list)
@@ -17,10 +17,12 @@ class DragonChain(object):
         return self
 
     def map(self, func):
-        return self.__class__(map(func, self))
+        self._stream = map(func, self._stream)
+        return self
 
     def filter(self, func):
-        return self.__class__(filter(func, self))
+        self._stream = filter(func, self._stream)
+        return self
 
     def collect(self, collector):
         return collector(self)
