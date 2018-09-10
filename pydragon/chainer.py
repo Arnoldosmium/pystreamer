@@ -28,10 +28,10 @@ class Dragon(object):
         return self
 
     def chain(self, *args):
-        return self.add(args)
+        return self.add(*args)
 
     def concat(self, *args):
-        return self.add(args)
+        return self.add(*args)
 
     def map(self, func):
         self._stream = map(func, self._stream)

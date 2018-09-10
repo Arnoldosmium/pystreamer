@@ -10,3 +10,6 @@ def streamify(stream_or_object):
 
     else:
         return iter([stream_or_object])
+
+def identity(x):
+    return x
