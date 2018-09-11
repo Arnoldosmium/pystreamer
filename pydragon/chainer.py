@@ -80,11 +80,11 @@ class Dragon(object):
         return self
 
     def takewhile(self, func):
-        self.__stream = takewhile(self.__stream, func)
+        self.__stream = takewhile(func, self.__stream)
         return self
 
     def cutoff_if(self, func):
-        return self.takewhile(func)
+        return self.takewhile(lambda x: not func(x))
 
     def skip(self, num):
         if num > 0:
@@ -92,8 +92,30 @@ class Dragon(object):
         return self
 
     def dropwhile(self, func):
-        self.__stream = dropwhile(self.__stream, func)
+        self.__stream = dropwhile(func, self.__stream)
         return self
 
     def skip_util(self, func):
-        return self.dropwhile(func)
+        return self.dropwhile(lambda x: not func(x))
+
+
+class DictDragon(Dragon):
+
+    def __init__(self, *list_of_dicts):
+        super(DictDragon, self).__init__(*map(dict.items, list_of_dicts))
+
+    def map_items(self, func):
+        self._Dragon__stream = starmap(func, self._Dragon__stream)
+        return self
+
+    def map_keys(self, func):
+        return self.map_items(lambda k, v: (func(k), v))
+
+    def map_values(self, func):
+        return self.map_items(lambda k, v: (k, func(v)))
+
+    def collect_dict(self):
+        return self.collect(dict)
+
+    def build_dict(self):
+        return self.collect_dict()

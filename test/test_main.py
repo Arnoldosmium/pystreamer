@@ -80,3 +80,20 @@ def test_skip_limit():
         .skip(10) \
         .collect(list)
     assert s2 == []
+
+
+def test_conditional_cutoff_and_skip():
+    random_str = "dlakfjaskdjflwerijaskljakflsjcioaofjalkxcjar"
+
+    s1 = Stream("random_string:%s" % random_str) \
+        .skip_util(lambda ch: ch == ":") \
+        .skip(1) \
+        .collect("".join)
+    assert s1 == random_str
+
+    s2 = Stream("random_string:%s" % random_str) \
+        .skip_util(lambda ch: ch == ":") \
+        .skip(1) \
+        .cutoff_if(lambda ch: ch == "r") \
+        .collect("".join)
+    assert s2 == random_str[:random_str.find("r")]
