@@ -30,6 +30,16 @@ def test_basic():
     assert s5 == (list(range(0, 10, 2)), list(range(0, 10, 4)))
 
 
+def test_distinct():
+    s1 = Stream(range(10)) \
+        .concat(range(20)) \
+        .distinct() \
+        .collect(list)
+    assert s1 == list(range(20))
+
+    assert Stream("abcba").distinct().collect("".join) == "abc"
+
+
 def test_skip():
     s1 = Stream(range(10)) \
             .skip(5) \

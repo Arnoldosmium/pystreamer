@@ -64,6 +64,20 @@ class Dragon(object):
         for element in self:
             func(element)
 
+    def distinct(self):
+        _stream = self.__stream
+
+        def _distinct_stream():
+            _stash = set()
+            for item in _stream:
+                if item not in _stash:
+                    _stash.add(item)
+                    yield item
+
+        self.__stream = _distinct_stream()
+        return self
+
+
     def max(self, key=None):
         if key is None:
             return max(self)
@@ -98,6 +112,10 @@ class Dragon(object):
     def skip_util(self, func):
         return self.dropwhile(lambda x: not func(x))
 
+    def stream_transform(self, stream_func):
+        self.__stream = stream_func(self.__stream)
+        return self
+
 
 class DictDragon(Dragon):
 
@@ -105,14 +123,19 @@ class DictDragon(Dragon):
         super(DictDragon, self).__init__(*map(dict.items, list_of_dicts))
 
     def map_items(self, func):
-        self._Dragon__stream = starmap(func, self._Dragon__stream)
-        return self
+        return self.stream_transform(lambda stream: starmap(func, stream))
 
     def map_keys(self, func):
         return self.map_items(lambda k, v: (func(k), v))
 
     def map_values(self, func):
         return self.map_items(lambda k, v: (k, func(v)))
+
+    def merge_dicts(self, *list_of_dicts):
+        return self.add(*map(dict.items, list_of_dicts))
+
+    def with_overrides(self, *list_of_dicts):
+        return self.merge_dicts(*list_of_dicts)
 
     def collect_dict(self):
         return self.collect(dict)
