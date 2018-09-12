@@ -54,6 +54,9 @@ class Dragon(object):
     def collect(self, collector):
         return collector(self)
 
+    def build_dict(self):
+        return self.collect_dict()
+
     def reduce(self, reducer, initial_value=None):
         if initial_value is not None:
             return reduce(reducer, self.__stream, initial_value)
@@ -76,7 +79,6 @@ class Dragon(object):
 
         self.__stream = _distinct_stream()
         return self
-
 
     def max(self, key=None):
         if key is None:
@@ -116,6 +118,13 @@ class Dragon(object):
         self.__stream = stream_func(self.__stream)
         return self
 
+    def enumerate(self):
+        self.__stream = enumerate(self.__stream)
+        return self
+
+    def to_dict_stream(self):
+        return DictDragon({}).add(self.map(lambda item: tuple(item) if len(item) == 2 else (item[0], tuple(item[1:]))))
+
 
 class DictDragon(Dragon):
 
@@ -139,6 +148,3 @@ class DictDragon(Dragon):
 
     def collect_dict(self):
         return self.collect(dict)
-
-    def build_dict(self):
-        return self.collect_dict()
