@@ -1,150 +1,249 @@
 from itertools import chain, islice, dropwhile, takewhile, starmap
 from functools import reduce
 from .util import streamify
+from .operator import Deduplicator
 
 
 class Dragon(object):
+    """
+    The Stream / Dragon class is the chainable wrapper class around any generators / iterators
+    Generators and iterators are merged together during creation time.
+    """
+
     @staticmethod
-    def prepare_stream(*stream_or_things):
-        if len(stream_or_things) == 1:
-            return streamify(stream_or_things[0])
+    def _prepare_stream(*generators_or_iterables):
+        if len(generators_or_iterables) == 1:
+            return streamify(generators_or_iterables[0])
         else:
-            return chain.from_iterable(map(streamify, stream_or_things))
+            return chain.from_iterable(map(streamify, generators_or_iterables))
 
-    def __init__(self, *stream_or_things):
-        self.__stream = Dragon.prepare_stream(*stream_or_things)
+    def __init__(self, *generators_or_iterables):
+        """
+        Initialize Dragon objects
+        :param generators_or_iterables: any numbers of generators or iterables
+        """
+        self.__stream = Dragon._prepare_stream(*generators_or_iterables)
 
+    # Python 3 support
     def __next__(self):
         return next(self.__stream)
 
+    # Python 2 support
     def next(self):
         return self.__next__()
 
+    # to iterator
     def __iter__(self):
-        return self
+        return self.__stream
 
-    def add(self, *stream_or_things):
-        self.__stream = Dragon.prepare_stream(self.__stream, *stream_or_things)
-        return self
+    def add(self, *generators_or_iterables):
+        """
+        Append iterators to current stream
+        :param generators_or_iterables: any numbers of generators or iterables
+        :return: New Dragon instance wrapping the union stream
+        """
+        return Dragon(self.__stream, *generators_or_iterables)
 
-    def chain(self, *args):
-        return self.add(*args)
+    def chain(self, *generators_or_iterables):
+        """
+        (alias of add) Append iterators to current stream
+        :param generators_or_iterables: any numbers of generators or iterables
+        :return: New Dragon instance wrapping the union stream
+        """
+        return self.add(*generators_or_iterables)
 
-    def concat(self, *args):
-        return self.add(*args)
+    def concat(self, *generators_or_iterables):
+        """
+        (alias of add) Append iterators to current stream
+        :param generators_or_iterables: any numbers of generators or iterables
+        :return: New Dragon instance wrapping the union stream
+        """
+        return self.add(*generators_or_iterables)
 
     def map(self, func):
-        self.__stream = map(func, self.__stream)
-        return self
+        """
+        Equivalent to builtin map function
+        :param func: function each element will be passed to
+        :return: New Dragon instance wrapping the mapped stream
+        """
+        return Dragon(map(func, self.__stream))
 
     def flat_map(self, func):
-        self.__stream = chain.from_iterable(map(streamify, map(func, self.__stream)))
-        return self
+        """
+        Flattening (once) if any element is a collection or iterator
+        :param func: function each current element will be passed to
+        :return: New Dragon instance wrapping the flat_mapped stream
+        """
+        return Dragon(chain.from_iterable(map(streamify, map(func, self.__stream))))
 
     def filter(self, func):
-        self.__stream = filter(func, self.__stream)
-        return self
+        """
+        Pick elements that pass the test
+        :param func: (element -> boolean) function each current element will be tested against
+        :return: New Dragon instance wrapping the filtered stream
+        """
+        return Dragon(filter(func, self.__stream))
 
     def exclude(self, func):
+        """
+        Filter out elements that pass the test
+        :param func: (element -> boolean) function each current element will be tested against
+        :return: New Dragon instance wrapping the filtered stream
+        """
         return self.filter(lambda x: not func(x))
 
     def minus(self, func):
+        """
+        (alias of exclude) Filter out elements that pass the test
+        :param func: (element -> boolean) function each current element will be tested against
+        :return: New Dragon instance wrapping the filtered stream
+        """
         return self.exclude(func)
 
     def collect(self, collector):
+        """
+        [Consumer operation] passes the stream to collector
+        :param collector: (stream -> any) function iterates through the stream
+        :return: the result after piping stream to collector function
+        """
         return collector(self)
 
-    def build_dict(self):
-        return self.collect_dict()
+    def collect_dict(self, dict_collector=dict):
+        """
+        [Consumer operation] passes the stream to dict collector
+        :param dict_collector: (stream<I extends item> -> D extends dict) function iterates through the item stream
+        :return: the result after piping stream to dict collector function
+        """
+        return self.map(lambda each: (each[0], each[1] if len(each) == 2 else each[1:])) \
+                    .collect(dict_collector)
+
+    def build_dict(self, dict_collector=dict):
+        """
+        (alias of collect_dict) [Consumer operation] passes the stream to dict collector
+        :param dict_collector: (stream<I extends item> -> D extends dict) function iterates through the item stream
+        :return: the result after piping stream to dict collector function
+        """
+        return self.collect_dict(dict_collector)
+
+    def collect_as_map(self, map_collector=dict):
+        """
+        (alias of collect_dict) [Consumer operation] passes the stream to dict collector
+        :param map_collector: (stream<I extends item> -> D extends dict) function iterates through the item stream
+        :return: the result after piping stream to dict collector function
+        """
+        return self.collect_dict(map_collector)
 
     def reduce(self, reducer, initial_value=None):
+        """
+        [Consumer operation] equivalent to functool reduce. Passes the stream to reducer
+        :param reducer: (T extends any, element -> T) function takes each item and produce an (aggregated) value
+        :param initial_value: (T) optional value, served as the starting value.
+        :return: the result after reducing the stream
+        """
         if initial_value is not None:
             return reduce(reducer, self.__stream, initial_value)
         else:
             return reduce(reducer, self.__stream)
 
     def foreach(self, func):
+        """
+        [Consumer operation] passes the stream to func
+        :param func: (element -> void) function runs on each element
+        """
         for element in self:
             func(element)
 
     def distinct(self):
-        _stream = self.__stream
-
-        def _distinct_stream():
-            _stash = set()
-            for item in _stream:
-                if item not in _stash:
-                    _stash.add(item)
-                    yield item
-
-        self.__stream = _distinct_stream()
-        return self
+        """
+        Gives stream with distinct elements
+        :return: stream with distinct elements
+        """
+        return Dragon(Deduplicator(self.__stream))
 
     def max(self, key=None):
+        """
+        [Consumer operation] grab the max value in the stream
+        :param key: (element -> C extends comparable) optional evaluator to compare elements
+        :return: the max element in the stream
+        """
         if key is None:
             return max(self)
         return max(self, key=key)
 
     def min(self, key=None):
+        """
+        [Consumer operation] grab the min value in the stream
+        :param key: (element -> C extends comparable) optional evaluator to compare elements
+        :return: the min element in the stream
+        """
         if key is None:
             return min(self)
         return min(self, key=key)
 
     def limit(self, num):
+        """
+        Limit the stream to certain amount of elements
+        :param num: number of elements stream limit to
+        :return: the limited stream
+        """
         if num > 0:
-            self.__stream = islice(self.__stream, num)
+            return Dragon(islice(self.__stream, num))
         return self
 
     def takewhile(self, func):
-        self.__stream = takewhile(func, self.__stream)
-        return self
+        return Dragon(takewhile(func, self.__stream))
 
     def cutoff_if(self, func):
         return self.takewhile(lambda x: not func(x))
 
     def skip(self, num):
         if num > 0:
-            self.__stream = islice(self.__stream, num, None)
+            return Dragon(islice(self.__stream, num, None))
         return self
 
     def dropwhile(self, func):
-        self.__stream = dropwhile(func, self.__stream)
-        return self
+        return Dragon(dropwhile(func, self.__stream))
 
     def skip_util(self, func):
         return self.dropwhile(lambda x: not func(x))
 
     def stream_transform(self, stream_func):
-        self.__stream = stream_func(self.__stream)
-        return self
+        return Dragon(stream_func(self.__stream))
 
     def enumerate(self):
-        self.__stream = enumerate(self.__stream)
-        return self
-
-    def to_dict_stream(self):
-        return DictDragon({}).add(self.map(lambda item: tuple(item) if len(item) == 2 else (item[0], tuple(item[1:]))))
+        return Dragon(enumerate(self.__stream))
 
 
 class DictDragon(Dragon):
 
-    def __init__(self, *list_of_dicts):
-        super(DictDragon, self).__init__(*map(dict.items, list_of_dicts))
+    def __init__(self, *list_of_dicts, wrap=None):
+        if wrap is None:
+            super(DictDragon, self).__init__(*map(
+                lambda aDict: map(lambda key: (key, aDict[key]), aDict),    # manually generate lazy dict item iterator
+                list_of_dicts
+            ))
+        else:
+            if len(list_of_dicts):
+                raise ValueError("No other iterator source should be provided when wrapping an iterator")
+            super(DictDragon, self).__init__(wrap)
 
     def map_items(self, func):
-        return self.stream_transform(lambda stream: starmap(func, stream))
+        return DictDragon(wrap=self.stream_transform(lambda stream: starmap(func, stream)))
 
     def map_keys(self, func):
         return self.map_items(lambda k, v: (func(k), v))
 
+    def filter_keys(self, func):
+        return DictDragon(wrap=filter(lambda kv: func(kv[0]), iter(self)))
+
     def map_values(self, func):
         return self.map_items(lambda k, v: (k, func(v)))
 
+    def filter_values(self, func):
+        return DictDragon(wrap=filter(lambda kv: func(kv[1]), iter(self)))
+
     def merge_dicts(self, *list_of_dicts):
-        return self.add(*map(dict.items, list_of_dicts))
+        return DictDragon(wrap=self.add(DictDragon(*list_of_dicts)))
 
     def with_overrides(self, *list_of_dicts):
         return self.merge_dicts(*list_of_dicts)
-
-    def collect_dict(self):
-        return self.collect(dict)
