@@ -107,11 +107,3 @@ def test_conditional_cutoff_and_skip():
         .cutoff_if(lambda ch: ch == "r") \
         .collect("".join)
     assert s2 == random_str[:random_str.find("r")]
-
-
-def test_to_dict_stream():
-    s1 = Stream("abcdefg") \
-        .enumerate() \
-        .to_dict_stream() \
-        .collect_dict()
-    assert s1 == {i: ch for i, ch in enumerate("abcdefg")}

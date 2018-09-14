@@ -4,13 +4,14 @@ class Deduplicator(object):
         self.__stream = stream
 
     def __next__(self):
-        for item in self.__stream:
-            if item not in self.__stash:
-                self.__stash.add(item)
-                yield item
+        item = next(self.__stream)
+        while item in self.__stash:
+            item = next(self.__stream)
+        self.__stash.add(item)
+        return item
 
     def next(self):
-        return self.next()
+        return self.__next__()
 
     def __iter__(self):
         return self
