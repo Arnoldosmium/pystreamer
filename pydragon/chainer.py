@@ -191,32 +191,72 @@ class Dragon(object):
         return self
 
     def takewhile(self, func):
+        """
+        Limit the stream to the first element on which test fails; equivalent to itertools takewhile
+        :param func: (element -> boolean) function each current element will be tested against
+        :return: the limited stream
+        """
         return Dragon(takewhile(func, self.__stream))
 
     def cutoff_if(self, func):
+        """
+        Limit the stream to the first element on which test succeeds
+        :param func: (element -> boolean) function each current element will be tested against
+        :return: the limited stream
+        """
         return self.takewhile(lambda x: not func(x))
 
     def skip(self, num):
+        """
+        Skip the first several elements in the stream
+        :param num: number of elements stream to skip
+        :return: the skipped stream
+        """
         if num > 0:
             return Dragon(islice(self.__stream, num, None))
         return self
 
     def dropwhile(self, func):
+        """
+        Skip the stream util the first element on which test fails; equivalent to itertools dropwhile
+        :param func: (element -> boolean) function each current element will be tested against
+        :return: the skipped stream
+        """
         return Dragon(dropwhile(func, self.__stream))
 
     def skip_util(self, func):
+        """
+        Skip the stream util the first element on which test succeeds
+        :param func: (element -> boolean) function each current element will be tested against
+        :return: the skipped stream
+        """
         return self.dropwhile(lambda x: not func(x))
 
     def stream_transform(self, stream_func):
+        """
+        Run arbitrary stream transformation
+        :param stream_func: (stream -> stream) stream transformation function
+        :return: A Dragon with processed stream
+        """
         return Dragon(stream_func(self.__stream))
 
     def enumerate(self):
+        """
+        Similar to builtin enumerate function
+        :return: A Dragon with original stream enumerated
+        """
         return Dragon(enumerate(self.__stream))
 
 
 class DictDragon(Dragon):
 
     def __init__(self, *list_of_dicts, wrap=None):
+        """
+        The DictStream / DictDragon class is the chainable wrapper class around any generators / iterators of dict item
+        like elements
+        :param list_of_dicts: a list of dict-like elements
+        :param wrap: <OR> wrap a stream with DictDragon class
+        """
         if wrap is None:
             super(DictDragon, self).__init__(*map(
                 lambda aDict: map(lambda key: (key, aDict[key]), aDict),    # manually generate lazy dict item iterator
@@ -228,22 +268,57 @@ class DictDragon(Dragon):
             super(DictDragon, self).__init__(wrap)
 
     def map_items(self, func):
-        return DictDragon(wrap=self.stream_transform(lambda stream: starmap(func, stream)))
+        """
+        Pass key and item respectively to the map function
+        :param func: (key, value -> any) item map function
+        :return: A Dragon wrapping resulting stream
+        """
+        return self.stream_transform(lambda stream: starmap(func, stream))
 
     def map_keys(self, func):
-        return self.map_items(lambda k, v: (func(k), v))
+        """
+        Apply the map function only to the keys
+        :param func: (key -> key_like) key map function
+        :return: A DictDragon wrapping transformed item
+        """
+        return DictDragon(wrap=self.map_items(lambda k, v: (func(k), v)))
 
     def filter_keys(self, func):
         return DictDragon(wrap=filter(lambda kv: func(kv[0]), iter(self)))
 
     def map_values(self, func):
-        return self.map_items(lambda k, v: (k, func(v)))
+        """
+        Apply the map function only to the values
+        :param func: (value -> any) value map function
+        :return: A DictDragon wrapping transformed item
+        """
+        return DictDragon(wrap=self.map_items(lambda k, v: (k, func(v))))
 
     def filter_values(self, func):
         return DictDragon(wrap=filter(lambda kv: func(kv[1]), iter(self)))
 
-    def merge_dicts(self, *list_of_dicts):
+    def add_dicts(self, *list_of_dicts):
+        """
+        Add in several dicts
+        :param list_of_dicts: a list of dicts to merge in
+        :return: A DictDragon with all items
+        """
         return DictDragon(wrap=self.add(DictDragon(*list_of_dicts)))
 
     def with_overrides(self, *list_of_dicts):
-        return self.merge_dicts(*list_of_dicts)
+        """
+        (alias of add_dicts) Add in several dicts
+        :param list_of_dicts: a list of dicts to merge in
+        :return: A DictDragon with all items (overrides on collections
+        """
+        return self.add_dicts(*list_of_dicts)
+
+    @staticmethod
+    def merge_dicts(*dicts_to_merge, dict_collector=dict):
+        """
+        Static method to help merge dicts
+        :param dicts_to_merge: a list of dicts; following dicts override previous dicts
+        :param dict_collector: default built-in dict
+        :return: A merged dict
+        """
+        return DictDragon(*dicts_to_merge).build_dict(dict_collector)
