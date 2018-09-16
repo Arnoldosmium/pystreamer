@@ -5,11 +5,12 @@ def streamify(stream_or_object):
         return stream_or_object
 
     # iterables
-    elif hasattr(stream_or_object, "__iter__"):
+    elif hasattr(stream_or_object, "__iter__") or hasattr(stream_or_object, "__getitem__"):
         return iter(stream_or_object)
 
     else:
         return iter([stream_or_object])
+
 
 def identity(x):
     return x
