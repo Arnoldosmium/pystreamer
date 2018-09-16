@@ -114,8 +114,7 @@ class Dragon(object):
         :param dict_collector: (stream<I extends item> -> D extends dict) function iterates through the item stream
         :return: the result after piping stream to dict collector function
         """
-        return self.map(lambda each: (each[0], each[1] if len(each) == 2 else each[1:])) \
-                    .collect(dict_collector)
+        return dict_collector((each[0], each[1] if len(each) == 2 else each[1:]) for each in self.__stream)
 
     def build_dict(self, dict_collector=dict):
         """
@@ -258,9 +257,9 @@ class DictDragon(Dragon):
         :param wrap: <OR> wrap a stream with DictDragon class
         """
         if wrap is None:
-            super(DictDragon, self).__init__(*map(
-                lambda aDict: map(lambda key: (key, aDict[key]), aDict),    # manually generate lazy dict item iterator
-                list_of_dicts
+            super(DictDragon, self).__init__(*(
+                ((key, aDict[key]) for key in aDict)
+                for aDict in list_of_dicts
             ))
         else:
             if len(list_of_dicts):
@@ -284,7 +283,7 @@ class DictDragon(Dragon):
         return DictDragon(wrap=self.map_items(lambda k, v: (func(k), v)))
 
     def filter_keys(self, func):
-        return DictDragon(wrap=filter(lambda kv: func(kv[0]), iter(self)))
+        return DictDragon(wrap=(elem for elem in self if func(elem[0])))
 
     def map_values(self, func):
         """
@@ -295,7 +294,7 @@ class DictDragon(Dragon):
         return DictDragon(wrap=self.map_items(lambda k, v: (k, func(v))))
 
     def filter_values(self, func):
-        return DictDragon(wrap=filter(lambda kv: func(kv[1]), iter(self)))
+        return DictDragon(wrap=(elem for elem in self if func(elem[1])))
 
     def add_dicts(self, *list_of_dicts):
         """
