@@ -314,11 +314,12 @@ class DictDragon(Dragon):
         return self.add_dicts(*list_of_dicts)
 
     @staticmethod
-    def merge_dicts(*dicts_to_merge, dict_collector=dict):
+    def merge_dicts(*dicts_to_merge, **kwargs):
         """
         Static method to help merge dicts
         :param dicts_to_merge: a list of dicts; following dicts override previous dicts
         :param dict_collector: default built-in dict
         :return: A merged dict
         """
+        dict_collector = kwargs.get("dict_collector", dict)
         return DictDragon(*dicts_to_merge).build_dict(dict_collector)
