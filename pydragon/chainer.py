@@ -249,13 +249,14 @@ class Dragon(object):
 
 class DictDragon(Dragon):
 
-    def __init__(self, *list_of_dicts, wrap=None):
+    def __init__(self, *list_of_dicts, **kwargs):
         """
         The DictStream / DictDragon class is the chainable wrapper class around any generators / iterators of dict item
         like elements
         :param list_of_dicts: a list of dict-like elements
         :param wrap: <OR> wrap a stream with DictDragon class
         """
+        wrap = kwargs.get("wrap")
         if wrap is None:
             super(DictDragon, self).__init__(*(
                 ((key, aDict[key]) for key in aDict)
