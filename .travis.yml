@@ -1,12 +1,16 @@
 language: python
-
 python:
-  - 2.7
-  - 3.6
-
+- 2.7
+- 3.6
 install:
-  - pip install pytest
-  - pip install wheel
-
+- pip install pytest
+- pip install wheel
 script:
-  - pytest
+- pytest
+deploy:
+  provider: pypi
+  user: arnoldosmium
+  password:
+    secure: GoxXiUsFmgJ7Cjo+VLzwYNC1+DtH6FeBtjah7yeoVOVouadqJ3aekRlkEXiygG0nRvbQbxonM0NYU81jQl4c+Dgmp4XNOT2QEyzwdqnSIR1butchWyqvxyYy7Mp83fg82X6AMkE3rvXyus3d4RHWycL9nxOfBojb8CiK+t2e8AC6BZaphFAzpRotl1Y8qiTJl/ByvUso3GU9Bgr6lXLTt+DHCU1CMuR7furBlAyKZiqI6KaN5O3sPkJKdfl6O0jWiONepBFi2JlQoBjN7WCbvUsgkKSDUVYcYQfIjymVqB/vDeZ3hJGf9ELmLuuiL++eIq3orfG2wDcAn2uzR6Vit5HIwyH2Hvkw1fSuK1QOkJJLHsSjiU9aLJ0Q7JvqSXbI4jqcd3fYknsDVI1c5fzOVCLrsDuVxDtrKZ5iz8lhntUlysnCbqxaFg/1SypS3XUawJjfALirTqnslxykX0kd0hReA+C3rpqT80ahkoKqCUV9utvnguDSQGEkcO4JZpLuELTL5NZ6Jf/Gm2xvTak4Bb3NOgCemy2zMtyfBv5y7We8NvuLgFaWOjGlz0ZNx6RGqVq9OKQZOLjuALmpWNOrkDAfrdnZvlNGTt0wkjZoDWLIWXwvKorAVHkeNngMtGY4C+CuYcALcvEwf+Weq3AwS97II+0OuaXUkNY8P6dzNlA=
+  server: https://test.pypi.org/legacy
+  distributions: bdist_wheel
