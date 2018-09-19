@@ -1,5 +1,5 @@
-from pydragon import Stream
-from pydragon.util import identity
+from streamer import Stream
+from streamer.util import identity
 
 
 def test_basic():

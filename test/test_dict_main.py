@@ -1,4 +1,4 @@
-from pydragon import DictStream, Stream
+from streamer import DictStream, Stream
 
 
 def test_dict_main():

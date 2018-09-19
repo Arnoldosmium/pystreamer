@@ -8,9 +8,9 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='pydragon',
+    name='pyStreamer',
 
-    version='0.0.3',
+    version='0.0.1',
 
     description='A chainable stream solution',
 
@@ -18,7 +18,7 @@ setup(
 
     long_description_content_type='text/markdown',
 
-    url='https://github.com/Arnoldosmium/pydragon',
+    url='https://github.com/Arnoldosmium/pystreamer',
 
     author='Arnold Lin',
 
