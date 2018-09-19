@@ -1,6 +1,15 @@
 from setuptools import setup, find_packages
+import os
+import re
 from os import path
 from io import open
+
+VERSION = os.environ.get("PACKAGE_VERSION", None)
+try:
+    assert re.match("^([0-9]+\.)+[0-9]+$", VERSION)
+except Exception as e:
+    print("Invalid version string:", VERSION)
+    raise e
 
 here = path.abspath(path.dirname(__file__))
 
@@ -10,7 +19,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 setup(
     name='pyStreamer',
 
-    version='0.0.1',
+    version=VERSION,
 
     description='A chainable stream solution',
 
