@@ -4,12 +4,13 @@ import re
 from os import path
 from io import open
 
-VERSION = os.environ.get("PACKAGE_VERSION", None)
-try:
-    assert re.match("^([0-9]+\.)+[0-9]+$", VERSION)
-except Exception as e:
-    print('Invalid version string: "{}"'.format(VERSION))
-    raise e
+# VERSION = os.environ.get("PACKAGE_VERSION", None)
+# try:
+#     assert re.match("^([0-9]+\.)+[0-9]+$", VERSION)
+# except Exception as e:
+#     print('Invalid version string: "{}"'.format(VERSION))
+#     raise e
+VERSION = "0.0.2"
 
 here = path.abspath(path.dirname(__file__))
 
