@@ -1,14 +1,14 @@
 language: python
 python:
-- 2.7
-- 3.6
+  - 2.7
+  - 3.6
 install:
-- pip install pytest
-- pip install wheel
+  - pip install pytest
+  - pip install wheel
 script:
-- pytest
+  - pytest
 before_deploy:
-- export PACKAGE_VERSION="$(git describe)"
+  - export PACKAGE_VERSION="$(git describe)"
 deploy:
   provider: pypi
   user: arnoldosmium
@@ -17,3 +17,4 @@ deploy:
   distributions: bdist_wheel
   on:
     python: 3.6
+    tags: true
