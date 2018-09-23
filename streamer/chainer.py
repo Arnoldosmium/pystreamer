@@ -4,9 +4,9 @@ from .util import streamify
 from .operator import Deduplicator
 
 
-class Dragon(object):
+class Stream(object):
     """
-    The Stream / Dragon class is the chainable wrapper class around any generators / iterators
+    The Stream class is the chainable wrapper class around any generators / iterators
     Generators and iterators are merged together during creation time.
     """
 
@@ -17,12 +17,16 @@ class Dragon(object):
         else:
             return chain.from_iterable(map(streamify, generators_or_iterables))
 
+    @staticmethod
+    def of_list(*elements):
+        return Stream(elements)
+
     def __init__(self, *generators_or_iterables):
         """
-        Initialize Dragon objects
+        Initialize Stream objects
         :param generators_or_iterables: any numbers of generators or iterables
         """
-        self.__stream = Dragon._prepare_stream(*generators_or_iterables)
+        self.__stream = Stream._prepare_stream(*generators_or_iterables)
 
     # Python 3 support
     def __next__(self):
@@ -40,15 +44,15 @@ class Dragon(object):
         """
         Append iterators to current stream
         :param generators_or_iterables: any numbers of generators or iterables
-        :return: New Dragon instance wrapping the union stream
+        :return: New Stream instance wrapping the union stream
         """
-        return Dragon(self.__stream, *generators_or_iterables)
+        return Stream(self.__stream, *generators_or_iterables)
 
     def chain(self, *generators_or_iterables):
         """
         (alias of add) Append iterators to current stream
         :param generators_or_iterables: any numbers of generators or iterables
-        :return: New Dragon instance wrapping the union stream
+        :return: New Stream instance wrapping the union stream
         """
         return self.add(*generators_or_iterables)
 
@@ -56,7 +60,7 @@ class Dragon(object):
         """
         (alias of add) Append iterators to current stream
         :param generators_or_iterables: any numbers of generators or iterables
-        :return: New Dragon instance wrapping the union stream
+        :return: New Stream instance wrapping the union stream
         """
         return self.add(*generators_or_iterables)
 
@@ -64,31 +68,31 @@ class Dragon(object):
         """
         Equivalent to builtin map function
         :param func: function each element will be passed to
-        :return: New Dragon instance wrapping the mapped stream
+        :return: New Stream instance wrapping the mapped stream
         """
-        return Dragon(map(func, self.__stream))
+        return Stream(map(func, self.__stream))
 
     def flat_map(self, func):
         """
         Flattening (once) if any element is a collection or iterator
         :param func: function each current element will be passed to
-        :return: New Dragon instance wrapping the flat_mapped stream
+        :return: New Stream instance wrapping the flat_mapped stream
         """
-        return Dragon(chain.from_iterable(map(streamify, map(func, self.__stream))))
+        return Stream(chain.from_iterable(map(streamify, map(func, self.__stream))))
 
     def filter(self, func):
         """
         Pick elements that pass the test
         :param func: (element -> boolean) function each current element will be tested against
-        :return: New Dragon instance wrapping the filtered stream
+        :return: New Stream instance wrapping the filtered stream
         """
-        return Dragon(filter(func, self.__stream))
+        return Stream(filter(func, self.__stream))
 
     def exclude(self, func):
         """
         Filter out elements that pass the test
         :param func: (element -> boolean) function each current element will be tested against
-        :return: New Dragon instance wrapping the filtered stream
+        :return: New Stream instance wrapping the filtered stream
         """
         return self.filter(lambda x: not func(x))
 
@@ -96,7 +100,7 @@ class Dragon(object):
         """
         (alias of exclude) Filter out elements that pass the test
         :param func: (element -> boolean) function each current element will be tested against
-        :return: New Dragon instance wrapping the filtered stream
+        :return: New Stream instance wrapping the filtered stream
         """
         return self.exclude(func)
 
@@ -157,7 +161,7 @@ class Dragon(object):
         Gives stream with distinct elements
         :return: stream with distinct elements
         """
-        return Dragon(Deduplicator(self.__stream))
+        return Stream(Deduplicator(self.__stream))
 
     def max(self, key=None):
         """
@@ -186,7 +190,7 @@ class Dragon(object):
         :return: the limited stream
         """
         if num > 0:
-            return Dragon(islice(self.__stream, num))
+            return Stream(islice(self.__stream, num))
         return self
 
     def takewhile(self, func):
@@ -195,7 +199,7 @@ class Dragon(object):
         :param func: (element -> boolean) function each current element will be tested against
         :return: the limited stream
         """
-        return Dragon(takewhile(func, self.__stream))
+        return Stream(takewhile(func, self.__stream))
 
     def cutoff_if(self, func):
         """
@@ -212,7 +216,7 @@ class Dragon(object):
         :return: the skipped stream
         """
         if num > 0:
-            return Dragon(islice(self.__stream, num, None))
+            return Stream(islice(self.__stream, num, None))
         return self
 
     def dropwhile(self, func):
@@ -221,7 +225,7 @@ class Dragon(object):
         :param func: (element -> boolean) function each current element will be tested against
         :return: the skipped stream
         """
-        return Dragon(dropwhile(func, self.__stream))
+        return Stream(dropwhile(func, self.__stream))
 
     def skip_util(self, func):
         """
@@ -235,43 +239,43 @@ class Dragon(object):
         """
         Run arbitrary stream transformation
         :param stream_func: (stream -> stream) stream transformation function
-        :return: A Dragon with processed stream
+        :return: A Stream with processed stream
         """
-        return Dragon(stream_func(self.__stream))
+        return Stream(stream_func(self.__stream))
 
     def enumerate(self):
         """
         Similar to builtin enumerate function
-        :return: A Dragon with original stream enumerated
+        :return: A Stream with original stream enumerated
         """
-        return Dragon(enumerate(self.__stream))
+        return Stream(enumerate(self.__stream))
 
 
-class DictDragon(Dragon):
+class DictStream(Stream):
 
     def __init__(self, *list_of_dicts, **kwargs):
         """
-        The DictStream / DictDragon class is the chainable wrapper class around any generators / iterators of dict item
+        The DictStream / DictStream class is the chainable wrapper class around any generators / iterators of dict item
         like elements
         :param list_of_dicts: a list of dict-like elements
-        :param wrap: <OR> wrap a stream with DictDragon class
+        :param wrap: <OR> wrap a stream with DictStream class
         """
         wrap = kwargs.get("wrap")
         if wrap is None:
-            super(DictDragon, self).__init__(*(
+            super(DictStream, self).__init__(*(
                 ((key, aDict[key]) for key in aDict)
                 for aDict in list_of_dicts
             ))
         else:
             if len(list_of_dicts):
                 raise ValueError("No other iterator source should be provided when wrapping an iterator")
-            super(DictDragon, self).__init__(wrap)
+            super(DictStream, self).__init__(wrap)
 
     def map_items(self, func):
         """
         Pass key and item respectively to the map function
         :param func: (key, value -> any) item map function
-        :return: A Dragon wrapping resulting stream
+        :return: A Stream wrapping resulting stream
         """
         return self.stream_transform(lambda stream: starmap(func, stream))
 
@@ -279,37 +283,47 @@ class DictDragon(Dragon):
         """
         Apply the map function only to the keys
         :param func: (key -> key_like) key map function
-        :return: A DictDragon wrapping transformed item
+        :return: A DictStream wrapping transformed item
         """
-        return DictDragon(wrap=self.map_items(lambda k, v: (func(k), v)))
+        return DictStream(wrap=self.map_items(lambda k, v: (func(k), v)))
 
     def filter_keys(self, func):
-        return DictDragon(wrap=(elem for elem in self if func(elem[0])))
+        """
+        Pick dict elements whose keys pass the test
+        :param func: (key -> boolean) function each key will be tested against
+        :return: A DictStream instance wrapping the filtered stream
+        """
+        return DictStream(wrap=(elem for elem in self if func(elem[0])))
 
     def map_values(self, func):
         """
         Apply the map function only to the values
         :param func: (value -> any) value map function
-        :return: A DictDragon wrapping transformed item
+        :return: A DictStream wrapping transformed item
         """
-        return DictDragon(wrap=self.map_items(lambda k, v: (k, func(v))))
+        return DictStream(wrap=self.map_items(lambda k, v: (k, func(v))))
 
     def filter_values(self, func):
-        return DictDragon(wrap=(elem for elem in self if func(elem[1])))
+        """
+        Pick dict elements whose values pass the test
+        :param func: (key -> boolean) function each value will be tested against
+        :return: A DictStream instance wrapping the filtered stream
+        """
+        return DictStream(wrap=(elem for elem in self if func(elem[1])))
 
     def add_dicts(self, *list_of_dicts):
         """
         Add in several dicts
         :param list_of_dicts: a list of dicts to merge in
-        :return: A DictDragon with all items
+        :return: A DictStream with all items
         """
-        return DictDragon(wrap=self.add(DictDragon(*list_of_dicts)))
+        return DictStream(wrap=self.add(DictStream(*list_of_dicts)))
 
     def with_overrides(self, *list_of_dicts):
         """
         (alias of add_dicts) Add in several dicts
         :param list_of_dicts: a list of dicts to merge in
-        :return: A DictDragon with all items (overrides on collections
+        :return: A DictStream with all items (overrides on collections
         """
         return self.add_dicts(*list_of_dicts)
 
@@ -322,4 +336,4 @@ class DictDragon(Dragon):
         :return: A merged dict
         """
         dict_collector = kwargs.get("dict_collector", dict)
-        return DictDragon(*dicts_to_merge).build_dict(dict_collector)
+        return DictStream(*dicts_to_merge).build_dict(dict_collector)

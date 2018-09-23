@@ -107,3 +107,10 @@ def test_conditional_cutoff_and_skip():
         .cutoff_if(lambda ch: ch == "r") \
         .collect("".join)
     assert s2 == random_str[:random_str.find("r")]
+
+
+def test_static_of_operation():
+    explicit = ["this", "is", "an", "explicit", "list"]
+    assert Stream.of_list(*explicit) \
+        .collect(list) \
+        == explicit
