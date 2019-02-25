@@ -29,9 +29,11 @@ setup(
 
     url='https://github.com/Arnoldosmium/pystreamer',
 
+    download_url='https://pypi.org/project/pyStreamer/',
+
     author='Arnold Lin',
 
-    # author_email=None,  # TODO: put the right email
+    author_email="contact@arnoldlin.tech",
 
     classifiers=[
         'Development Status :: 4 - Beta',
