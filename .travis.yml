@@ -1,7 +1,9 @@
+dist: xenial
 language: python
 python:
   - 2.7
   - 3.6
+  - 3.7
 install:
   - pip install pytest
   - pip install wheel
@@ -14,7 +16,7 @@ deploy:
   user: arnoldosmium
   password:
     secure: SzARlypQXSrr4fD2vFg4BP6MLC8Uvno0qegNFTX3dlB7QYzLJ8QuV+WI1uCbdt4gydi8L7xwXGv5a19HPrQwy4YmKDFAwgBl1FYkXbPm1JS1sTgYlagjcrSabF208lFN0zVWCduL4Shb+fxhPglsnPPlP7TIYeE7lWzTfysMU2sbBsQk0cNK6O9s2B03+Zpi2HudDgEt/ZNxMNybtzz1tTtxn40T7pNxmZzi4qsYNzFMJscf+XHMkxRVHXaxnEWy3NSQ/dFVnljMrCQGKryyl7IjG/eMpyKBAEI+er+YZWHufJfOeHvlXn0bZ991BrbaCz9mLOkK69oOsP35NXqQ8GnuJC8s22qEXK10C4gdTqoqYxsIqLe0mTuuj5IzzeT79i3NYZaSacmNafM2jmFXkHmXw5PYJziBL3dbprMCRJd2Qqj17eOHvz8ATkWf36KOc7MnDWArgK2YnAt4mekEWheO/VOLdmJ6EjUNCP+5wVnE723oVEQfYI0F58M1FAakWJo0n55jnV2PeCHpfDdUWtyrtGp6ydLsEOoTMFY6wfkLG+LN67flrKaBtu7dSh2h8JPY/BhHszNkjHVtL5ggjWcKCco0izFORoEDHNFnv3qHM3slfCbUMZ+Tj2Y9drbj8Ft0RwC3qAGhkIpP8BslQHpXfBeAURHQD6Mg4oSMh7I=
-  distributions: bdist_wheel
+  distributions: "sdist bdist_wheel"
   on:
     python: 3.6
     tags: true
