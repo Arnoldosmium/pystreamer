@@ -9,8 +9,8 @@ install:
   - pip install wheel
 script:
   - pytest
-before_deploy:
-  - export PACKAGE_VERSION="$(git describe)"
+  - ./render_setup.sh
+  - python setup.py build --dry-run
 deploy:
   provider: pypi
   user: arnoldosmium
