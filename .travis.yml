@@ -11,6 +11,8 @@ script:
   - pytest
   - ./render_setup.sh
   - python setup.py build --dry-run
+before_deploy:
+  - ./render_setup.sh
 deploy:
   provider: pypi
   user: arnoldosmium
