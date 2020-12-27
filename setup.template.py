@@ -18,7 +18,7 @@ setup(
 
     version=VERSION,
 
-    description='A chainable stream solution',
+    description='A lazy evaluating, memory friendly, chainable stream solution',
 
     long_description=long_description,
 
@@ -40,12 +40,11 @@ setup(
 
         'License :: OSI Approved :: MIT License',
 
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
     ],
 
     keywords='stream generator chain',  # Optional

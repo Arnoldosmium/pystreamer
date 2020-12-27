@@ -1,5 +1,5 @@
 from streamer import Stream
-from streamer.util import identity
+from .util import identity
 
 
 def test_basic():
@@ -16,7 +16,7 @@ def test_basic():
     assert s2 == set("this is a test what a test".split())
 
     s3set = set()
-    s3 = Stream("this is a test".split()) \
+    Stream("this is a test".split()) \
         .flat_map(identity) \
         .foreach(s3set.add)
     assert s3set == set("thisisatest")
@@ -26,8 +26,22 @@ def test_basic():
     assert s4 == 1013
 
     s5 = Stream(range(10)) \
-        .reduce(lambda prev, this: (prev[0] if this % 2 else prev[0] + [this], prev[1] if this % 4 else prev[1] + [this]), ([], []))
+        .reduce(lambda prev, this: (
+            prev[0] if this % 2 else prev[0] + [this],
+            prev[1] if this % 4 else prev[1] + [this]), ([], []))
     assert s5 == (list(range(0, 10, 2)), list(range(0, 10, 4)))
+
+    s6dict = {}
+    Stream(list("abcd")) \
+        .foreach_index(lambda i, ch: s6dict.__setitem__(i, ch))
+    s6dict2 = Stream(list("abcd")) \
+        .map_with_index(lambda i, ch: (i, ch)) \
+        .collect_dict()
+    assert s6dict == dict(enumerate("abcd")) == s6dict2
+
+
+def test_string_is_streamed():
+    assert Stream("a string").collect(list) == list("a string")
 
 
 def test_distinct():
