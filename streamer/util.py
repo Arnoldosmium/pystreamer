@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+
+"""
+streamer.util
+---
+
+The module contains some common tools used by the package.
+This should be treated as an internal module and it's subjected to breaking changes.
+"""
+
 from typing import Iterable, Iterator, Union, TypeVar
 
 T = TypeVar('T')

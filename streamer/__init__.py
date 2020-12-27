@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from .stream import Stream, DictStream
-Dragon = ItemStream = Stream
+ItemStream = Stream
 MapStream = DictStream

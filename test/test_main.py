@@ -1,4 +1,5 @@
 from streamer import Stream
+from streamer.operator import RepeatApply
 from .util import identity
 
 
@@ -122,9 +123,32 @@ def test_conditional_cutoff_and_skip():
         .collect("".join)
     assert s2 == random_str[:random_str.find("r")]
 
+    s3 = Stream(RepeatApply(1, lambda x: x + 1)) \
+        .takewhile(lambda x: x % 10) \
+        .collect_as_list()
+    assert s3 == list(range(1, 10))
+
 
 def test_static_of_operation():
     explicit = ["this", "is", "an", "explicit", "list"]
     assert Stream.of_list(*explicit) \
         .collect(list) \
         == explicit
+
+
+def test_count_collection():
+    assert Stream(range(1, 101)) \
+        .flat_map(range) \
+        .count() == 5050
+
+
+def test_stream_boolean_tests():
+    example = list(range(10))
+    assert Stream(example).map(str).all_match(lambda s: len(s) == 1)
+    assert Stream(example).any_match(lambda x: x > 8)
+    assert Stream(example).none_match(lambda x: x < 0)
+
+
+def test_find_a_element():
+    assert Stream("abcd").find_first() == 'a'
+    assert Stream(range(10)).filter(lambda x: x < 0).find_any() is None
