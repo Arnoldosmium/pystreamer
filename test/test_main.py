@@ -40,6 +40,10 @@ def test_basic():
         .collect_dict()
     assert s6dict == dict(enumerate("abcd")) == s6dict2
 
+    assert Stream(range(10)) \
+        .map(str) \
+        .reduce_right(lambda prev, this: prev + this, "") == "9876543210"
+
 
 def test_string_is_streamed():
     assert Stream("a string").collect(list) == list("a string")
@@ -53,6 +57,10 @@ def test_distinct():
     assert s1 == list(range(20))
 
     assert Stream("abcba").distinct().collect("".join) == "abc"
+    assert Stream("ddabbbcaca").distinct(more_than=3).collect("".join) == "ba"
+    assert Stream(range(9, 1, -1)) \
+        .distinct(key=lambda x: x % 2) \
+        .collect_as_set() == {9, 8}
 
 
 def test_skip():
@@ -72,6 +80,16 @@ def test_skip():
         .skip(15) \
         .collect(list)
     assert s3 == []
+
+    sample_map = {int(x): i for i, x in enumerate('4738')}
+    assert Stream(range(10)) \
+        .map(lambda x: sample_map.get(x)) \
+        .not_none() \
+        .collect_as_set() == set(sample_map.values())
+
+    assert Stream(range(10)) \
+        .without(*sample_map.keys()) \
+        .collect_as_set() == set(range(10)) - set(sample_map.keys())
 
 
 def test_limit():
@@ -129,7 +147,7 @@ def test_conditional_cutoff_and_skip():
     assert s3 == list(range(1, 10))
 
 
-def test_static_of_operation():
+def test_static_of_method():
     explicit = ["this", "is", "an", "explicit", "list"]
     assert Stream.of_list(*explicit) \
         .collect(list) \
@@ -152,3 +170,34 @@ def test_stream_boolean_tests():
 def test_find_a_element():
     assert Stream("abcd").find_first() == 'a'
     assert Stream(range(10)).filter(lambda x: x < 0).find_any() is None
+
+    ref = []
+    assert Stream(range(10)) \
+        .peek(ref.append) \
+        .collect_as_list() == list(range(10))
+    assert ref[0] == 0
+
+
+def test_sort():
+    assert Stream(range(10)) \
+        .sorted(lambda x: (x % 2, x)) \
+        .collect_as_list() == list(range(0, 10, 2)) + list(range(1, 10, 2))
+
+    assert Stream('abcd') \
+        .sorted() \
+        .sorted(reverse=True) \
+        .collect("".join) == "dcba"
+
+    assert Stream.of_list(4, 7, 3, 8) \
+        .sorted() \
+        .collect_as_list() == [3, 4, 7, 8]
+
+
+def test_intersperse():
+    sample_string = "this is a test"
+    assert Stream(sample_string.split()) \
+        .intersperse(" ") \
+        .collect("".join) == sample_string
+
+    assert Stream([]).intersperse("any").collect("".join) == ""
+    assert Stream("1").intersperse("great").collect("".join) == "1"

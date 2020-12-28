@@ -11,7 +11,7 @@ from itertools import chain, islice, dropwhile, takewhile, starmap
 from functools import reduce
 from typing import Callable, Union, List, Set, Iterator, Iterable, TypeVar, Generic, Dict, Tuple, Any
 from .util import to_iterator
-from .operator import Deduplicator
+from .operator import Deduplicator, Inserter
 from .collector import Collector, CountCollector
 
 T = TypeVar('T')
@@ -134,6 +134,38 @@ class Stream(Generic[T]):
         """
         return self.exclude(func)
 
+    def not_none(self):
+        """
+        Filter out elements that are `None`s
+        :return: New stream without None
+        """
+        return self.exclude(lambda x: x is None)
+
+    def without(self, *exclusion: T):
+        """
+        Filter out elements that are in exclusion list
+        :param exclusion: items to exclude
+        :return: New stream with exclusion filtered
+        """
+        all_exclusions = set(exclusion)
+        return Stream(elem for elem in self.__stream if elem not in all_exclusions)
+
+    def peek(self, func: Callable[[T], None], raise_on_error: bool = False):
+        """
+        Run function on the first element without altering or consuming it.
+        :param func: function to run on first element
+        :param raise_on_error: flag to enforce raising no element error
+        :return: Effectively same stream
+        """
+        maybe_elem = self.find_first()
+        if maybe_elem is None:
+            if raise_on_error:
+                raise ValueError("The stream is empty, cannot apply `peek` to it")
+            return self
+        else:
+            func(maybe_elem)
+        return Stream((maybe_elem,), self)
+
     ###
     # Consumer operations
     ###
@@ -189,7 +221,7 @@ class Stream(Generic[T]):
         """
         return self.collect_dict(map_collector)
 
-    def reduce(self, reducer: Callable, initial_value: Union[T, None] = None):
+    def reduce(self, reducer: Callable[[R, T], R], initial_value: Union[R, None] = None):
         """
         [Consumer operation] equivalent to functool reduce. Passes the stream to reducer
         :param reducer: (T extends any, element -> T) function takes each item and produce an (aggregated) value
@@ -200,6 +232,19 @@ class Stream(Generic[T]):
             return reduce(reducer, self.__stream, initial_value)
         else:
             return reduce(reducer, self.__stream)
+
+    def reduce_right(self, reducer: Callable[[R, T], R], initial_value: Union[R, None] = None) -> R:
+        """
+        [Consumer operation] equivalent to functool reduce. Passes the stream in reverse order to reducer
+        :param reducer: (R result, T element -> T) function takes each item and produce an (aggregated) value
+        :param initial_value: (R) optional value, served as the starting value.
+        :return: R - the result after reducing the stream
+        """
+        reversed_seq = list(self.__stream)[::-1]
+        if initial_value is not None:
+            return reduce(reducer, reversed_seq, initial_value)
+        else:
+            return reduce(reducer, reversed_seq)
 
     def foreach(self, func: Callable[[T], None]) -> None:
         """
@@ -254,6 +299,17 @@ class Stream(Generic[T]):
         """
         return self.collect(CountCollector())
 
+    def sorted(self, key: Union[Callable[[T], Any], None] = None, reverse: bool = False):
+        """
+        [Consumer operation] effectively collects all element for comparison and sorting for a sorted stream
+        :param: key - optional comparison method
+        :param: reverse - if the order of sort should be reversed (decreasing order)
+        :return: A sorted stream
+        TODO: stream sort condition marker
+        TODO: parallel implementation
+        """
+        return Stream(sorted(self, key=key, reverse=reverse))
+
     ###
     # Element extraction method
     ###
@@ -280,12 +336,16 @@ class Stream(Generic[T]):
     # Element removal Operations
     ###
 
-    def distinct(self):
+    def distinct(self, *, more_than: int = 1, key: Union[Callable[[T], Any], None] = None):
         """
         Gives stream with distinct elements
+        :param: more_than - only show elements that appear at least this number of times; at least 1
+        :param: key - apply this function to the element for de-duplicating; \
+            only first of the elements have same key will be preserved.
         :return: stream with distinct elements
+        TODO: stream distinct condition marker
         """
-        return Stream(Deduplicator(self.__stream))
+        return Stream(Deduplicator(self.__stream, more_than=more_than, key=key))
 
     def limit(self, num: int):
         """
@@ -343,7 +403,7 @@ class Stream(Generic[T]):
     # Advanced operations
     ###
 
-    def max(self, key=None):
+    def max(self, key: Union[Callable[[T], Any], None] = None):
         """
         [Consumer operation] grab the max value in the stream
         :param key: (element -> C extends comparable) optional evaluator to compare elements
@@ -353,7 +413,7 @@ class Stream(Generic[T]):
             return max(self)
         return max(self, key=key)
 
-    def min(self, key=None):
+    def min(self, key: Union[Callable[[T], Any], None] = None):
         """
         [Consumer operation] grab the min value in the stream
         :param key: (element -> C extends comparable) optional evaluator to compare elements
@@ -363,7 +423,13 @@ class Stream(Generic[T]):
             return min(self)
         return min(self, key=key)
 
-
+    def intersperse(self, delimiter: T):
+        """
+        A new stream in which the delimiter is inserted in between every adjacent elements.
+        :param delimiter: same kind of existing elements
+        :return: a new stream
+        """
+        return Stream(Inserter(self, delimiter))
 
     def stream_transform(self, stream_func: Callable[[Iterator[T]], Iterator[R]]):
         """
@@ -380,14 +446,13 @@ V = TypeVar('V')
 
 class DictStream(Stream[Tuple[K, V]]):
 
-    def __init__(self, *list_of_dicts: Dict[K, V], **kwargs):
+    def __init__(self, *list_of_dicts: Dict[K, V], wrap: Union[Iterator[Tuple[K, V]], None] = None):
         """
         The MapStream / DictStream class is the chainable wrapper class around any generators / iterators of dict item
         like elements
         :param list_of_dicts: a list of dict-like elements
         :param wrap: <OR> wrap a stream with DictStream class
         """
-        wrap: Iterator[Tuple[K, V]] = kwargs.get("wrap")
         if wrap is None:
             super(DictStream, self).__init__(*(
                 ((key, dct[key]) for key in dct)
@@ -469,12 +534,11 @@ class DictStream(Stream[Tuple[K, V]]):
             return self.add_dicts(*list_of_dicts)
 
     @staticmethod
-    def merge_dicts(*dicts_to_merge, **kwargs):
+    def merge_dicts(*dicts_to_merge, dict_collector: Callable[[Iterator[Tuple[K, V]]], Dict[K, V]] = dict):
         """
         Static method to help merge dicts
         :param dicts_to_merge: a list of dicts; following dicts override previous dicts
         :param dict_collector: default built-in dict
         :return: A merged dict
         """
-        dict_collector = kwargs.get("dict_collector", dict)
         return DictStream(*dicts_to_merge).build_dict(dict_collector)
