@@ -8,10 +8,16 @@ The module contains some iterator operator - add operation to an iterator and ke
 """
 
 from typing import Generic, TypeVar, Iterator, Iterable, Callable, Union, Any, Tuple
-from collections import Counter
+from collections import Counter, namedtuple, defaultdict
+from functools import reduce
 from abc import ABCMeta, abstractmethod
+from .collector import Collector
 
 T = TypeVar('T')
+K = TypeVar('K')
+V = TypeVar('V')
+
+_EmptyReference = namedtuple("_EmptyReference", "")()
 
 
 class _AbstractOperator(Generic[T], metaclass=ABCMeta):
@@ -66,15 +72,15 @@ class Inserter(_AbstractOperator[T]):
         self.__stream = stream
         self.__delim = delimiter
         self.__turn = 0
-        self.__elem = None
+        self.__elem = _EmptyReference
 
     def __next__(self) -> T:
-        if self.__elem is None:
+        if self.__elem == _EmptyReference:
             self.__elem = next(self.__stream)
 
         self.__turn += 1
         if self.__turn & 1:
-            nxt, self.__elem = self.__elem, None
+            nxt, self.__elem = self.__elem, _EmptyReference
             return nxt
         else:
             return self.__delim
@@ -88,10 +94,10 @@ class PairUp(_AbstractOperator[T]):
     def __init__(self, stream: Iterator[T]):
         self.__stream = stream
         self.__turn = 0
-        self.__prev = None
+        self.__prev = _EmptyReference
 
     def __next__(self) -> Tuple[T, T]:
-        if self.__prev is None:    # initial condition
+        if self.__prev == _EmptyReference:    # initial condition
             self.__prev = next(self.__stream)
         curr = next(self.__stream)
         pair = (self.__prev, curr)
@@ -119,6 +125,64 @@ def Zipper(*iterable: Iterable, fill_none: bool = False):
 
         if not all_stops:
             yield tuple(nxt)
+
+
+class Collapser(_AbstractOperator[T]):
+    """
+    An iterator as stream operator for collapsing adjacent elements
+    """
+    def __init__(self,
+                 stream: Iterator[T],
+                 collapsible: Callable[[T, T], bool],
+                 *,
+                 combiner: Union[None, Callable[[T, T], T]] = None,
+                 collector: Union[None, Collector] = None):
+        assert combiner is not None or collector is not None, "At least a combiner or collector is provided."
+        self.__stream = stream
+        self.__collapsible = collapsible
+        self.__combiner = combiner
+        self.__collector = collector
+        self.__prev = _EmptyReference
+
+    def _process_collection(self, collection: Iterable[T]):
+        if self.__combiner is not None:
+            return reduce(self.__combiner, collection)
+        elif self.__collector is not None:
+            return self.__collector.collect(collection)
+        raise ValueError("At least a combiner or collector is specified.")
+
+    def __next__(self):
+        if self.__prev == _EmptyReference:
+            self.__prev = next(self.__stream)
+
+        elements = [self.__prev]
+        while True:
+            curr = _EmptyReference
+            try:
+                curr = next(self.__stream)
+                if not self.__collapsible(self.__prev, curr):
+                    break
+                elements.append(curr)
+            except StopIteration:
+                break
+            finally:
+                self.__prev = curr
+
+        return self._process_collection(elements)
+
+
+def Grouper(stream: Iterator[Tuple[K, V]]):
+    """
+    An iterator as stream operator for grouping-by elements to a list according to its key
+    """
+    # Thanks to python generator, the expensive overhead / stream consumption will be deferred until request of first
+    # element.
+    collect_by_key = defaultdict(list)
+    for key, value in stream:
+        collect_by_key[key].append(value)
+
+    for key_value_tuple in collect_by_key.items():
+        yield key_value_tuple
 
 
 def RepeatApply(init, transform: Callable):

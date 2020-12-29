@@ -11,7 +11,7 @@ from itertools import chain, islice, dropwhile, takewhile, starmap
 from functools import reduce
 from typing import Callable, Union, List, Set, Iterator, Iterable, TypeVar, Generic, Dict, Tuple, Any
 from .util import to_iterator
-from .operator import Deduplicator, Inserter, PairUp, Zipper
+from .operator import Deduplicator, Inserter, PairUp, Zipper, Collapser, Grouper
 from .collector import Collector, CountCollector
 
 T = TypeVar('T')
@@ -280,6 +280,29 @@ class Stream(Generic[T]):
                 return True
         return False
 
+    def has_all(self, *candidate: T) -> bool:
+        """
+        [Terminal operation] test if all candidates exist in the stream
+        :param candidate: candidates to check
+        :return: test result
+        """
+        candidates = set(candidate)
+        for item in self.__stream:
+            if item in candidates:
+                candidates.remove(item)
+            if len(candidates) == 0:
+                return True
+        return False
+
+    def has_any(self, *candidate: T) -> bool:
+        """
+        [Terminal operation] test if at least one of the candidates exist in the stream
+        :param candidate: candidates to check
+        :return: test result
+        """
+        candidates = set(candidate)
+        return self.any_match(lambda item: item in candidates)
+
     def all_match(self, match: Callable[[T], bool]) -> bool:
         """
         [Terminal operation] test if all elements in the stream pass the predicate test
@@ -309,8 +332,8 @@ class Stream(Generic[T]):
     def sorted(self, key: Union[Callable[[T], Any], None] = None, reverse: bool = False):
         """
         [Near terminal operation] effectively collects all element for comparison and sorting for a sorted stream
-        :param: key - optional comparison method
-        :param: reverse - if the order of sort should be reversed (decreasing order)
+        :param key: optional comparison method
+        :param reverse: if the order of sort should be reversed (decreasing order)
         :return: A sorted stream
         TODO: stream sort condition marker
         TODO: parallel implementation
@@ -320,7 +343,7 @@ class Stream(Generic[T]):
     def for_pairs(self, func: Callable[[Tuple[T, T]], None]) -> None:
         """
         [Terminal operation] apply function to every adjacent pair
-        :param: func - function applying on all adjacent pairs
+        :param func: function applying on all adjacent pairs
         """
         for pair in PairUp(self.__stream):
             func(pair)
@@ -354,8 +377,8 @@ class Stream(Generic[T]):
     def distinct(self, *, more_than: int = 1, key: Union[Callable[[T], Any], None] = None):
         """
         Gives stream with distinct elements
-        :param: more_than - only show elements that appear at least this number of times; at least 1
-        :param: key - apply this function to the element for de-duplicating; \
+        :param more_than - only show elements that appear at least this number of times; at least 1
+        :param key - apply this function to the element for de-duplicating; \
             only first of the elements have same key will be preserved.
         :return: stream with distinct elements
         TODO: stream distinct condition marker
@@ -446,7 +469,7 @@ class Stream(Generic[T]):
         """
         return Stream(Inserter(self, delimiter))
 
-    def cross(self, elements: Iterable[R]) -> Iterator[Tuple[T, R]]:
+    def cross(self, elements: Iterable[R]):
         """
         Creates a new stream contain every pair of values and the cross elements.
         :param elements: for cross product
@@ -455,7 +478,7 @@ class Stream(Generic[T]):
         frozen_elements = frozenset(elements)
         return Stream((item, elem) for item in self.__stream for elem in frozen_elements)
 
-    def cross_result_of(self, generate: Callable[[T], Iterator[R]]) -> Iterator[Tuple[T, R]]:
+    def cross_result_of(self, generate: Callable[[T], Iterator[R]]):
         """
         Creates a new stream contain every pair of values and the results of generate function.
         :param generate: generator function
@@ -465,14 +488,14 @@ class Stream(Generic[T]):
 
     def map_pairs(self, func: Callable[[Tuple[T, T]], R]):
         """
-        map to new item on every adjacent pair
-        :param: func - mapping function applying on all adjacent pairs
+        Maps to new item on every adjacent pair
+        :param func: mapping function applying on all adjacent pairs
         """
         return Stream(func(pair) for pair in PairUp(self.__stream))
 
     def map_to_entry(self, to_entry: Callable[[T], Tuple[K, V]]):
         """
-        create an dict stream, entries of which are created by applying `to_entry` to existing element.
+        Creates a dict stream, entries of which are created by applying `to_entry` to existing element.
         :param to_entry: function to create K, V tuple pair from existing elements
         :return: DictStream
         """
@@ -480,7 +503,7 @@ class Stream(Generic[T]):
 
     def map_to_key_value(self, to_key: Callable[[T], K], to_val: Callable[[T], V]):
         """
-        create an dict stream, entries of which are key-value pairs by applying `to_key` `to_val` to existing element,
+        Creates a dict stream, entries of which are key-value pairs by applying `to_key` `to_val` to existing element,
         respectively.
         :param to_key: function to create key from existing elements
         :param to_val: function to create val from existing elements
@@ -489,9 +512,81 @@ class Stream(Generic[T]):
         return DictStream(wrap=((to_key(elem), to_val(elem)) for elem in self.__stream))
 
     def zip_with(self, *streams: Iterator[R], fill_none: bool = False):
+        """
+        Creates a new stream, the i-th element of which is a tuple of i-th elements of this plus all other streams.
+        :param streams: Other streams to get zipped
+        :param fill_none: True - stop fast when one of the stream depletes;
+            False - fill in None for depleted streams until all streams deplete.
+        :return: Stream with zipped tuples
+        """
         if len(streams) == 0:
             return self
         return Stream(Zipper(self.__stream, *streams, fill_none=fill_none))
+
+    def collapse_to_first(self, collapsible: Callable[[T, T], bool]):
+        """
+        Creates a stream with only the leading elements of all consecutively collapsible element chains
+        :param collapsible: determine if a pair of adjacent elements is collapsible.
+        :return: stream with collapsed result
+        """
+        return Stream(Collapser(self.__stream, collapsible, collector=Collector.of(lambda l: l[0])))
+
+    def collapse_and_combine(self, collapsible: Callable[[T, T], bool], combiner: Callable[[T, T], T]):
+        """
+        Creates a stream with all consecutively collapsible element chains combined with `combiner`
+        :param collapsible: determine if a pair of adjacent elements is collapsible.
+        :param combiner: apply this rule to the final chain of collapsible elements
+        :return: stream with collapsed result
+        """
+        return Stream(Collapser(self.__stream, collapsible, combiner=combiner))
+
+    def collapse_and_collect(self, collapsible: Callable[[T, T], bool], collector: Collector):
+        """
+        Creates a stream with all consecutively collapsible element chains collected `collector`
+        :param collapsible: determine if a pair of adjacent elements is collapsible.
+        :param collector: apply this collector to the final chain of collapsible elements
+        :return: stream with collapsed result
+        """
+        return Stream(Collapser(self.__stream, collapsible, collector=collector))
+
+    def adjacent_groups(self, in_same_group: Callable[[T, T], bool]):
+        """
+        Creates a stream of list with adjacent `in_same_group` elements groupped in
+        :param in_same_group: determine if an adjacent pair still in the same group.
+        :return: stream with adjacent element groups
+        """
+        return Stream(Collapser(self.__stream, in_same_group, collector=Collector.of(list)))
+
+    def adjacent_key_groups(self, group_key_of: Callable[[T], R]):
+        """
+        Creates a stream of tuples of group key / adjacent elements
+        :param group_key_of: get the group key of an element
+        :return: stream with group tuples
+        """
+        return Stream(Collapser(
+            self.__stream,
+            collapsible=lambda x, y: group_key_of(x) == group_key_of(y),
+            collector=Collector.of(lambda l: (group_key_of(l[0]), l))))
+
+    def group_by(self, key: Callable[[T], K]):
+        """
+        Creates a stream of map entries, keys of which are the result by applying `key` on all elements, and values of
+        which are the list of elements that result in the same key.
+        :param key: key generating function
+        :return: stream of map entries
+        """
+        return DictStream(wrap=Grouper(self.map_to_key_value(key, lambda item: item)))
+
+    def group_to_map(
+            self, key: Callable[[T], K], *, map_collector: Callable[[Iterator[Tuple]], Dict] = dict) -> Dict[K, List[T]]:
+        """
+        Creates a map, keys of which are the result by applying `key` on all elements, and values of which are
+        the list of elements that result in the same key.
+        :param key: key generating function
+        :param map_collector: transforming entry stream to a dict
+        :return: dict
+        """
+        return self.group_by(key).collect_as_map(map_collector=map_collector)
 
     def stream_transform(self, stream_func: Callable[[Iterator[T]], Iterator[R]]):
         """

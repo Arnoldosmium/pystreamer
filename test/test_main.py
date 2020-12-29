@@ -1,5 +1,6 @@
 from streamer import Stream
 from streamer.operator import RepeatApply
+from streamer.collector import Collector
 from .util import identity
 
 
@@ -202,6 +203,8 @@ def test_intersperse():
     assert Stream([]).intersperse("any").collect("".join) == ""
     assert Stream("1").intersperse("great").collect("".join) == "1"
 
+    assert Stream([None] * 2).intersperse(None).collect_as_list() == [None] * 3
+
 
 def test_cross_function():
     assert Stream(range(10)) \
@@ -220,6 +223,8 @@ def test_pair_up():
 
     assert Stream([]).map_pairs(lambda p: p).collect_as_set() == set()
     assert Stream('1').map_pairs(lambda p: p).collect_as_set() == set()
+
+    assert Stream([None] * 3).map_pairs(lambda p: p[0] is None and p[1] is None).collect_as_list() == [True, True]
 
 
 def test_zip():
@@ -241,3 +246,42 @@ def test_zip():
 
     s = Stream(range(10))
     assert s.zip_with() == s
+
+
+def test_combiner():
+    assert Stream(range(10)) \
+        .collapse_to_first(lambda x, y: (x * y) % 3 == 0) \
+        .collect_as_list() == [0, 2, 5, 8]
+    assert Stream(range(10)) \
+        .collapse_and_combine(lambda x, y: (x * y) % 3 == 0, lambda x, y: x + y) \
+        .collect_as_list() == [1, 9, 18, 17]
+    assert Stream(range(10)) \
+        .collapse_and_collect(lambda x, y: (x * y) % 3 == 0, Collector.of(list)) \
+        .collect_as_list() == [[0, 1], [2, 3, 4], [5, 6, 7], [8, 9]]
+
+    assert Stream([]).collapse_to_first(lambda *_: True).collect_as_set() == set()
+    assert Stream("1").collapse_to_first(lambda *_: True).collect_as_list() == ['1']
+    assert Stream(range(10)).collapse_to_first(lambda *_: False).collect_as_list() == list(range(10))
+
+    assert Stream(range(10)) \
+        .map(lambda x: None if x % 3 else x) \
+        .collapse_to_first(lambda _, y: y is None) \
+        .collect_as_list() == [x for x in range(10) if x % 3 == 0]
+
+    assert Stream(range(10)) \
+        .adjacent_groups(lambda x, y: (x - 5) * (y - 5) > 0) \
+        .collect_as_list() == [[0, 1, 2, 3, 4], [5], [6, 7, 8, 9]]
+
+    assert Stream(range(10)) \
+        .adjacent_key_groups(lambda x: x < 5) \
+        .collect_dict() == {
+            True: [0, 1, 2, 3, 4],
+            False: [5, 6, 7, 8, 9]}
+
+
+def test_grouper():
+    assert Stream(range(10)) \
+        .group_to_map(lambda x: x % 2) == {0: list(range(0, 10, 2)), 1: list(range(1, 10, 2))}
+    assert Stream([None] * 3) \
+        .group_to_map(lambda x: x is None) == {True: [None] * 3}
+    assert Stream([]).group_to_map(lambda x: x) == {}
