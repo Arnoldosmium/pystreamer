@@ -201,3 +201,43 @@ def test_intersperse():
 
     assert Stream([]).intersperse("any").collect("".join) == ""
     assert Stream("1").intersperse("great").collect("".join) == "1"
+
+
+def test_cross_function():
+    assert Stream(range(10)) \
+        .cross([1, 2]) \
+        .collect_as_list() == Stream(range(10)) \
+        .cross_result_of(lambda x: [1, 2]) \
+        .collect_as_list() == [(x, y) for x in range(10) for y in [1, 2]]
+
+
+def test_pair_up():
+    assert Stream(range(10)).map_pairs(lambda pair: pair[0] - pair[1]).collect_as_set() == {-1}
+
+    s = set()
+    Stream(range(10)).for_pairs(s.add)
+    assert s == {(x, x + 1) for x in range(9)}
+
+    assert Stream([]).map_pairs(lambda p: p).collect_as_set() == set()
+    assert Stream('1').map_pairs(lambda p: p).collect_as_set() == set()
+
+
+def test_zip():
+    assert Stream(range(10)) \
+        .zip_with(range(2), range(5)) \
+        .collect_as_list() == list(zip(range(10), range(2), range(5)))
+
+    assert Stream(range(10)) \
+        .zip_with(range(2), range(5), fill_none=True) \
+        .collect_as_list() == [(i, i if i < 2 else None, i if i < 5 else None) for i in range(10)]
+
+    assert Stream([None for _ in range(5)]) \
+        .zip_with(range(2), fill_none=True) \
+        .collect_as_list() == [(None, i if i < 2 else None) for i in range(5)]
+
+    assert Stream(range(10)) \
+        .zip_with([]) \
+        .collect_as_set() == set()
+
+    s = Stream(range(10))
+    assert s.zip_with() == s

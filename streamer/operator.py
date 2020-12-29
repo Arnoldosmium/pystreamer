@@ -7,18 +7,28 @@ streamer.operator
 The module contains some iterator operator - add operation to an iterator and keep its laziness.
 """
 
-from typing import Generic, TypeVar, Iterator, Callable, Union, Any
+from typing import Generic, TypeVar, Iterator, Iterable, Callable, Union, Any, Tuple
 from collections import Counter
+from abc import ABCMeta, abstractmethod
 
 T = TypeVar('T')
 
 
-class Deduplicator(Generic[T]):
+class _AbstractOperator(Generic[T], metaclass=ABCMeta):
+
+    @abstractmethod
+    def __next__(self):
+        raise NotImplementedError("Abstract operator cannot generate the next element")
+
+    def __iter__(self) -> Iterator[T]:
+        return self
+
+
+class Deduplicator(_AbstractOperator[T]):
     """
     An iterator as stream operator for deduplication.
     It yields distinct elements that fulfill requirements lazily.
     """
-
     def __init__(self, stream: Iterator[T], *, more_than: int = 1, key: Union[Callable[[T], Any], None] = None):
         self.__appeared = Counter()
         self.__stream = stream
@@ -43,19 +53,15 @@ class Deduplicator(Generic[T]):
 
         return item
 
-    def __iter__(self) -> Iterator[T]:
-        return self
-
     def key_stats(self):
         return dict(self.__appeared)
 
 
-class Inserter(Generic[T]):
+class Inserter(_AbstractOperator[T]):
     """
     An iterator as stream operator for inserting delimiter.
     It yields elements lazily.
     """
-
     def __init__(self, stream: Iterator[T], delimiter: T):
         self.__stream = stream
         self.__delim = delimiter
@@ -73,8 +79,46 @@ class Inserter(Generic[T]):
         else:
             return self.__delim
 
-    def __iter__(self) -> Iterator[T]:
-        return self
+
+class PairUp(_AbstractOperator[T]):
+    """
+    An iterator as stream operator for generating adjacent pairs.
+    It yields elements lazily.
+    """
+    def __init__(self, stream: Iterator[T]):
+        self.__stream = stream
+        self.__turn = 0
+        self.__prev = None
+
+    def __next__(self) -> Tuple[T, T]:
+        if self.__prev is None:    # initial condition
+            self.__prev = next(self.__stream)
+        curr = next(self.__stream)
+        pair = (self.__prev, curr)
+        self.__prev = curr
+        return pair
+
+
+def Zipper(*iterable: Iterable, fill_none: bool = False):
+    """
+    A generator that zip multiple iterators together.
+    """
+    all_streams = [iter(it) for it in iterable]
+
+    all_stops = False
+    while not all_stops:
+        nxt = [None for _ in iterable]
+        all_stops = True
+        for i, it in enumerate(all_streams):
+            try:
+                nxt[i] = next(it)
+                all_stops = False
+            except StopIteration:
+                if not fill_none:
+                    return
+
+        if not all_stops:
+            yield tuple(nxt)
 
 
 def RepeatApply(init, transform: Callable):
