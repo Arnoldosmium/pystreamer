@@ -5,12 +5,15 @@ streamer.operator
 ---
 
 The module contains some iterator operator - add operation to an iterator and keep its laziness.
+Treat this as a semi-internal module - subjected to breaking changes.
 """
 
 from typing import Generic, TypeVar, Iterator, Iterable, Callable, Union, Any, Tuple
-from collections import Counter, namedtuple, defaultdict
+from collections import Counter, namedtuple, defaultdict, deque
 from functools import reduce
 from abc import ABCMeta, abstractmethod
+import io
+import re
 from .collector import Collector
 
 T = TypeVar('T')
@@ -105,22 +108,25 @@ class PairUp(_AbstractOperator[T]):
         return pair
 
 
-def Zipper(*iterable: Iterable, fill_none: bool = False):
+def Zipper(*iterable: Iterable, stop_fast: bool = True, back_fill=None):
     """
     A generator that zip multiple iterators together.
+    :param iterable: Iterables to zip
+    :param stop_fast: whether to stop the zipper once one iterator depleted
+    :param back_fill: back fill placeholder if an iterator is depleted
     """
     all_streams = [iter(it) for it in iterable]
 
     all_stops = False
     while not all_stops:
-        nxt = [None for _ in iterable]
+        nxt = [back_fill for _ in iterable]
         all_stops = True
         for i, it in enumerate(all_streams):
             try:
                 nxt[i] = next(it)
                 all_stops = False
             except StopIteration:
-                if not fill_none:
+                if stop_fast:
                     return
 
         if not all_stops:
@@ -155,7 +161,7 @@ class Collapser(_AbstractOperator[T]):
         if self.__prev == _EmptyReference:
             self.__prev = next(self.__stream)
 
-        elements = [self.__prev]
+        elements = deque([self.__prev])
         while True:
             curr = _EmptyReference
             try:
@@ -177,22 +183,89 @@ def Grouper(stream: Iterator[Tuple[K, V]]):
     """
     # Thanks to python generator, the expensive overhead / stream consumption will be deferred until request of first
     # element.
-    collect_by_key = defaultdict(list)
+    collect_by_key = defaultdict(deque)
     for key, value in stream:
         collect_by_key[key].append(value)
 
-    for key_value_tuple in collect_by_key.items():
-        yield key_value_tuple
+    for key, value in collect_by_key.items():
+        yield key, list(value)
 
 
 def RepeatApply(init, transform: Callable):
+    """
+    A generator that recursively apply a function to an initial value
+    :param init: initial value
+    :param transform: function to apply every time to previous value
+    """
     p = init
     while True:
         yield p
         p = transform(p)
 
 
-def ContantOf(constant, repeat: int):
+def ConstantOf(constant, repeat: int):
+    """
+    A generator of same element x times
+    :param constant: element to yield every time
+    :param repeat: repeat times
+    """
     assert repeat > 0, "At least repeat 1 time."
     for i in range(repeat):
         yield constant
+
+
+def Cartesian(*sources: Iterator):
+    """
+    A generator of the result of cartesian product of multiple collections / sets.
+    :param sources: all collections
+    """
+    if len(sources) == 0:
+        return
+    if len(sources) == 1:
+        for item in sources[0]:
+            yield [item]
+        return
+
+    # Iterators should be treated as one-time consumptions. Use minimal memory usage at any time
+    memo = [deque() for _ in sources]    # track values that known upto now
+    buf = [None for _ in sources]   # buffer for final set of values
+
+    def generate_cartesian(rnd: int, idx: int, all_less_than_round: bool = True):
+        for i, val in enumerate(memo[idx]):
+            buf[idx] = val
+            if idx == len(buf) - 1:     # last iterator
+                if all_less_than_round and i < rnd:     # all index before current round number, already yield before.
+                    continue
+                yield tuple(buf)
+            else:
+                for t in generate_cartesian(rnd, idx + 1, all_less_than_round and (i < rnd)):
+                    yield t
+
+    zipper = Zipper(*sources, stop_fast=False, back_fill=_EmptyReference)
+    for rnd, values in enumerate(zipper):
+        for i, val in enumerate(values):
+            if val != _EmptyReference:
+                memo[i].append(val)
+
+        for t in generate_cartesian(rnd, 0):
+            yield t
+
+
+def Splitter(source: io.TextIOBase, regex: str):
+    pattern = re.compile(regex)
+
+    buf = ""
+    while True:
+        new_read = source.read(io.DEFAULT_BUFFER_SIZE)
+        if len(new_read) == 0:
+            yield buf
+            return
+        buf += new_read
+
+        start = 0
+        for match in pattern.finditer(buf):
+            end = match.start()
+            yield buf[start:end]
+            start = match.end()
+
+        buf = buf[start:]

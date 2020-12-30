@@ -475,8 +475,8 @@ class Stream(Generic[T]):
         :param elements: for cross product
         :return: a new stream
         """
-        frozen_elements = frozenset(elements)
-        return Stream((item, elem) for item in self.__stream for elem in frozen_elements)
+        element_list = list(elements)   # Cannot assume `elements` is a distinct set
+        return Stream((item, elem) for item in self.__stream for elem in element_list)
 
     def cross_result_of(self, generate: Callable[[T], Iterator[R]]):
         """
@@ -521,7 +521,7 @@ class Stream(Generic[T]):
         """
         if len(streams) == 0:
             return self
-        return Stream(Zipper(self.__stream, *streams, fill_none=fill_none))
+        return Stream(Zipper(self.__stream, *streams, stop_fast=not fill_none))
 
     def collapse_to_first(self, collapsible: Callable[[T, T], bool]):
         """
@@ -566,7 +566,7 @@ class Stream(Generic[T]):
         return Stream(Collapser(
             self.__stream,
             collapsible=lambda x, y: group_key_of(x) == group_key_of(y),
-            collector=Collector.of(lambda l: (group_key_of(l[0]), l))))
+            collector=Collector.of(lambda l: (group_key_of(l[0]), list(l)))))
 
     def group_by(self, key: Callable[[T], K]):
         """

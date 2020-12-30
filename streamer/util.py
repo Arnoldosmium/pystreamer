@@ -9,6 +9,7 @@ This should be treated as an internal module and it's subjected to breaking chan
 """
 
 from typing import Iterable, Iterator, Union, TypeVar
+import io
 
 T = TypeVar('T')
 
@@ -24,3 +25,15 @@ def to_iterator(stream_or_object: Union[Iterable[T], Iterator[T], T]) -> Iterato
 
     else:
         return iter((stream_or_object, ))
+
+
+def cast_to_text_io(content: Union[io.TextIOBase, str]):
+    if isinstance(content, io.IOBase):
+        if isinstance(content, io.TextIOBase):
+            return content
+        else:
+            raise ValueError("Only support TextIO instance family, %s not supported" % type(content))
+    elif isinstance(content, str):
+        return io.StringIO(content)
+    else:
+        raise ValueError("Unexpected type of content: %s" % type(content))
