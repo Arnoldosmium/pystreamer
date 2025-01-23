@@ -1,4 +1,4 @@
-PACKAGE_VERSION=$(git describe --tags | sed -E 's/-([0-9]+)-g/+\1.h/')
+PACKAGE_VERSION=$(git describe --tags | sed -E 's/-([0-9]+)-g.+/-rc\1/')
 
 echo Render version: $PACKAGE_VERSION
 
