@@ -1,5 +1,4 @@
 # pystreamer
-![Build Status](https://travis-ci.com/Arnoldosmium/pystreamer.svg?branch=develop)
 
 A lazy evaluating, memory friendly, chainable stream solution.
 

@@ -1,7 +1,6 @@
 name: Run Pipeline
 
 on:
-  workflow_dispatch: ~
   push:
     branches: [ develop ]
     tags:
@@ -14,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.11']
 
     steps:
     - uses: actions/checkout@v4
@@ -47,7 +46,6 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
 
     environment:
       name: pypi
@@ -74,9 +72,11 @@ jobs:
     - name: Build package
       run: |
         ./render_setup.sh
-        python setup.py build
+        python setup.py sdist bdist_wheel
     
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
+        verbose: true
+        username: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
